@@ -14,10 +14,10 @@ class Graphic2D(metaclass=ABCMeta):
                 callable(subclass.draw) or
                 NotImplemented)
 
-    def draw(self, canvas, fill="", outline="black"):
+    def draw(self, canvas, **kwargs):
         raise NotImplementedError
 
-    def redraw(self, canvas, fill="", outline="black"):
+    def redraw(self, canvas, **kwargs):
         raise NotImplementedError
 
 
@@ -52,7 +52,7 @@ class Collider2D(metaclass=ABCMeta):
 
 
 class Shape2D(ABC, Graphic2D, Collider2D):
-    def __init__(self, x, y, rotation=0):
+    def __init__(self, x, y, rotation=float(0)):
         self._center = np.array([x, y])
         self._rotation = rotation
         self._item = None
@@ -102,16 +102,16 @@ class Circle(Shape2D):
     def randomize_radius(self, min_radius, max_radius):
         self._radius = random() * (min_radius - max_radius) + min_radius
 
-    def draw(self, canvas, fill="", outline="black"):
+    def draw(self, canvas, **kwargs):
         if not self._item:
             x, y = self._center
             x1 = x - self._radius
             x2 = x + self._radius
             y1 = y - self._radius
             y2 = y + self._radius
-            self._item = canvas.create_oval(x1, y1, x2, y2, fill=fill, outline=outline)
+            self._item = canvas.create_oval(x1, y1, x2, y2, **kwargs)
 
-    def redraw(self, canvas, fill="", outline="black"):
+    def redraw(self, canvas, **kwargs):
         if self._item:
             x, y = self._center
             x1 = x - self._radius
@@ -119,7 +119,7 @@ class Circle(Shape2D):
             y1 = y - self._radius
             y2 = y + self._radius
             canvas.coords(self._item, x1, y1, x2, y2)
-            canvas.itemconfig(self._item, fill=fill, outline=outline)
+            canvas.itemconfig(self._item, **kwargs)
 
     def randomize_circle_coord(self, circle):
         # Generate x randomly inside the area.
@@ -189,7 +189,7 @@ class Rectangle(Shape2D):
     def set_height(self, height):
         self._height = height
 
-    def draw(self, canvas, fill="", outline="black"):
+    def draw(self, canvas, **kwargs):
         if not self._item:
             x = self._center[0]
             y = self._center[1]
@@ -199,11 +199,11 @@ class Rectangle(Shape2D):
             x2 = x + width
             y1 = y - height
             y2 = y + height
-            self._item = canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline=outline)
+            self._item = canvas.create_rectangle(x1, y1, x2, y2, **kwargs)
 
-    def redraw(self, canvas, fill="", outline="black"):
+    def redraw(self, canvas, **kwargs):
         if self._item:
-            canvas.itemconfig(self._item, fill=fill, outline=outline)
+            canvas.itemconfig(self._item, **kwargs)
 
     def randomize_circle_coord(self, circle):
         # Generate x randomly inside the area.
@@ -443,12 +443,14 @@ class Rectangle(Shape2D):
         return left and right and top and bottom
 
 
-class Segment(Graphic2D):
+class Segment(Shape2D):
     def __init__(self, start, end):
-        self.item = None
         self.start = start
         self.end = end
         self.vector = self.end - self.start
+        center = self.start + self.vector / 2
+        rotation = math.acos(self.vector[0] / self.magnitude())
+        super(Segment, self).__init__(center[0], center[1], rotation)
         dx = self.end[0] - self.start[0]
         dy = self.end[1] - self.start[1]
         if math.isclose(dx, 0):
@@ -461,14 +463,17 @@ class Segment(Graphic2D):
             self.C = self.A * self.start[0] + self.B * self.start[1]
         assert math.isclose(self.A * self.start[0] + self.B * self.start[1] - self.C, 0)
 
-    def draw(self, canvas, fill="", outline="black"):
-        if not self.item:
+    def draw(self, canvas, **kwargs):
+        if not self._item:
             x1, y1 = self.start[0], self.start[1]
             x2, y2 = self.end[0], self.end[1]
-            self.item = canvas.create_line(x1, y1, x2, y2, fill=fill)
+            self._item = canvas.create_line(x1, y1, x2, y2, **kwargs)
 
-    def redraw(self, canvas, fill="", outline="black"):
-        pass
+    def redraw(self, canvas, **kwargs):
+        if self._item:
+            x1, y1 = self.start[0], self.start[1]
+            x2, y2 = self.end[0], self.end[1]
+            canvas.itemconfig(self._item, x1, y1, x2, y2, **kwargs)
 
     # Find x knowing y.
     def x(self, y):
@@ -492,6 +497,12 @@ class Segment(Graphic2D):
         tx = (x - self.start[0]) / dx if not math.isclose(dx, 0) else 0
         ty = (y - self.start[1]) / dy if not math.isclose(dy, 0) else 0
         return tx, ty
+
+    def squared_magnitude(self):
+        return np.dot(self.vector, self.vector)
+
+    def magnitude(self):
+        return math.sqrt(np.dot(self.vector, self.vector))
 
     def squared_distance_from_point(self, point):
         x, y = point
@@ -534,3 +545,6 @@ class Segment(Graphic2D):
         x = (self.B * segment.C - segment.B * self.C) / (self.B * segment.A - segment.B * self.A)
         y = (self.A * segment.C - segment.A * self.C) / (self.A * segment.B - segment.A * self.B)
         return np.array([x, y])
+
+    def randomize_circle_coord(self, circle):
+        pass
